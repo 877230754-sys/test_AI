@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model LLMConfig {
+  id           Int      @id @default(autoincrement())
+  apiKey       String   @map("api_key")
+  modelName    String   @map("model_name")
+  temperature  Float?
+  maxTokens    Int?     @map("max_tokens")
+  apiEndpoint  String?  @map("api_endpoint")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("llm_config")
+}
+
+model EvaluationStandard {
+  id          Int                @id @default(autoincrement())
+  categoryId  String             @map("category_id")
+  categoryName String            @map("category_name")
+  version     String
+  status      String             @default("draft")
+  filePath    String?            @map("file_path")
+  createdBy   String             @map("created_by")
+  createdAt   DateTime           @default(now()) @map("created_at")
+  effectiveAt DateTime?          @map("effective_at")
+  dimensions  EvaluationDimension[]
+  batchTasks  BatchTask[]
+  brushTasks  BrushTask[]
+
+  @@map("evaluation_standard")
+}
+
+model EvaluationDimension {
+  id           Int      @id @default(autoincrement())
+  standardId    Int      @map("standard_id")
+  standard      EvaluationStandard @relation(fields: [standardId], references: [id], onDelete: Cascade)
+  dimensionName String   @map("dimension_name")
+  weight       Float
+  description  String
+  score1Desc   String?  @map("score_1_desc")
+  score3Desc   String?  @map("score_3_desc")
+  score5Desc   String?  @map("score_5_desc")
+  sortOrder    Int?     @map("sort_order")
+
+  @@map("evaluation_dimension")
+}
+
+model TestDataset {
+  id           Int          @id @default(autoincrement())
+  datasetName  String       @map("dataset_name")
+  categoryId   String       @map("category_id")
+  productCount Int          @map("product_count")
+  reviewCount  Int          @map("review_count")
+  filePath     String?      @map("file_path")
+  uploadedBy   String       @map("uploaded_by")
+  uploadedAt   DateTime     @default(now()) @map("uploaded_at")
+  status       String       @default("active")
+  products     TestProduct[]
+  batchTasks   BatchTask[]
+
+  @@map("test_dataset")
+}
+
+model TestProduct {
+  id         Int         @id @default(autoincrement())
+  datasetId  Int         @map("dataset_id")
+  dataset    TestDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  productId  String      @map("product_id")
+  productName String      @map("product_name")
+  category   String?
+  price      Float?
+  reviewCount Int         @map("review_count")
+  reviews    TestReview[]
+
+  @@map("test_product")
+}
+
+model TestReview {
+  id          Int   @id @default(autoincrement())
+  productId   Int   @map("product_id")
+  product     TestProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  reviewId    String @map("review_id")
+  userId      String? @map("user_id")
+  userLevel   Int?   @map("user_level")
+  reviewText  String @map("review_text")
+  imageUrls   String? @map("image_urls")
+  imageCount  Int?   @map("image_count")
+  textLength  Int?   @map("text_length")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("test_review")
+}
+
+model PromptTemplate {
+  id             Int      @id @default(autoincrement())
+  templateName   String   @map("template_name")
+  version        String
+  status         String   @default("draft")
+  promptContent  String   @map("prompt_content")
+  variables      String?
+  testAccuracy   Float?   @map("test_accuracy")
+  createdBy      String   @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  batchTasks     BatchTask[]
+  brushTasks     BrushTask[]
+
+  @@map("prompt_template")
+}
+
+model BatchTask {
+  id           Int                @id @default(autoincrement())
+  taskName     String             @map("task_name")
+  datasetId    Int                @map("dataset_id")
+  dataset      TestDataset        @relation(fields: [datasetId], references: [id])
+  standardId   Int                @map("standard_id")
+  standard     EvaluationStandard @relation(fields: [standardId], references: [id])
+  promptId     Int                @map("prompt_id")
+  prompt       PromptTemplate     @relation(fields: [promptId], references: [id])
+  status       String             @default("pending")
+  totalCount   Int                @map("total_count")
+  successCount Int                @default(0) @map("success_count")
+  failedCount  Int                @default(0) @map("failed_count")
+  concurrency  String             @default("medium")
+  startedAt    DateTime?          @map("started_at")
+  completedAt  DateTime?          @map("completed_at")
+  createdBy    String             @map("created_by")
+  results      BatchResult[]
+
+  @@map("batch_task")
+}
+
+model BatchResult {
+  id                 Int      @id @default(autoincrement())
+  taskId             Int      @map("task_id")
+  task               BatchTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  reviewId           String   @map("review_id")
+  productId          String   @map("product_id")
+  imageQualityScore  Float?   @map("image_quality_score")
+  relevanceScore     Float?   @map("relevance_score")
+  informativenessScore Float?  @map("informativeness_score")
+  authenticityScore  Float?   @map("authenticity_score")
+  professionalismScore Float?  @map("professionalism_score")
+  totalScore         Float    @map("total_score")
+  scoreDetails       String?  @map("score_details")
+  originalRank       Int      @map("original_rank")
+  newRank           Int      @map("new_rank")
+  acceptanceStatus   String?  @map("acceptance_status")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@map("batch_result")
+}
+
+model BrushTask {
+  id           Int                @id @default(autoincrement())
+  taskName     String             @map("task_name")
+  categoryId   String             @map("category_id")
+  standardId   Int                @map("standard_id")
+  standard     EvaluationStandard @relation(fields: [standardId], references: [id])
+  promptId     Int                @map("prompt_id")
+  prompt       PromptTemplate     @relation(fields: [promptId], references: [id])
+  scope        String             @default("all")
+  productCount Int                @map("product_count")
+  status       String             @default("pending")
+  scheduledAt  DateTime?          @map("scheduled_at")
+  startedAt    DateTime?          @map("started_at")
+  completedAt  DateTime?          @map("completed_at")
+  createdBy    String             @map("created_by")
+  results      BrushResult[]
+
+  @@map("brush_task")
+}
+
+model BrushResult {
+  id             Int       @id @default(autoincrement())
+  taskId         Int       @map("task_id")
+  task           BrushTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  productId      String    @map("product_id")
+  reviewIds      String    @map("review_ids")
+  reviewScores   String    @map("review_scores")
+  sortedReviewIds String   @map("sorted_review_ids")
+  pushStatus    String    @default("pending") @map("push_status")
+  pushedAt      DateTime? @map("pushed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@map("brush_result")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String
+  passwordHash String   @map("password_hash")
+  role         String   @default("operator")
+  email        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("user")
+}
